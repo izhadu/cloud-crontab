@@ -116,7 +116,7 @@ export const webhookChannel = {
         headers: headers
       };
 
-      // 核心修复：GET 和 HEAD 请求严禁携带 body
+      // 核心修复 1：GET 和 HEAD 请求严禁携带 body 数据体
       if (method !== 'GET' && method !== 'HEAD') {
         fetchOptions.body = JSON.stringify(requestBody);
       } else {
@@ -124,7 +124,15 @@ export const webhookChannel = {
         delete fetchOptions.headers['Content-Type'];
       }
 
-      const r = await fetch(config.WEBHOOK_URL, fetchOptions);
+      // 核心修复 2：支持 URL 内部的通用变量替换，并自动进行 URL 安全转码 (防止中文或特殊字符报错)
+      let finalUrl = config.WEBHOOK_URL.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+          return encodeURIComponent(String(data[key] ?? ''));
+        }
+        return '';
+      });
+
+      const r = await fetch(finalUrl, fetchOptions);
       const text = await r.text().catch(() => '');
       return r.ok ? ok('webhook', text) : fail('webhook', `HTTP ${r.status}`, text);
     } catch (err) {
