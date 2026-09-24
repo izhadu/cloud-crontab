@@ -110,11 +110,21 @@ export const webhookChannel = {
     }
 
     try {
-      const r = await fetch(config.WEBHOOK_URL, {
-        method: config.WEBHOOK_METHOD || 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
-      });
+      const method = (config.WEBHOOK_METHOD || 'POST').toUpperCase();
+      const fetchOptions = {
+        method: method,
+        headers: headers
+      };
+
+      // 核心修复：GET 和 HEAD 请求严禁携带 body
+      if (method !== 'GET' && method !== 'HEAD') {
+        fetchOptions.body = JSON.stringify(requestBody);
+      } else {
+        // GET 请求不需要 Content-Type
+        delete fetchOptions.headers['Content-Type'];
+      }
+
+      const r = await fetch(config.WEBHOOK_URL, fetchOptions);
       const text = await r.text().catch(() => '');
       return r.ok ? ok('webhook', text) : fail('webhook', `HTTP ${r.status}`, text);
     } catch (err) {
